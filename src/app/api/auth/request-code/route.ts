@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     }
   });
 
-  if (process.env.NODE_ENV !== "production") {
+  if (process.env.NODE_ENV !== "production" || process.env.SHOW_DEV_LOGIN_CODE === "true") {
     return Response.json({ ok: true, devCode: code });
   }
 

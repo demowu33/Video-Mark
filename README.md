@@ -50,6 +50,7 @@ Set these environment variables in Vercel:
 DATABASE_URL=your Supabase pooled or direct Postgres connection string
 APP_URL=https://your-vercel-domain.vercel.app
 SESSION_DAYS=14
+SHOW_DEV_LOGIN_CODE=true
 STORAGE_DRIVER=supabase
 SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
@@ -60,4 +61,4 @@ SUPABASE_STORAGE_BUCKET=videos
 
 The Vercel build command is defined in `vercel.json` and runs Prisma migrations before building.
 
-Production note: email delivery is not wired yet. Until a real email provider is added, production login code delivery needs to be implemented before inviting a wider team.
+Production note: `SHOW_DEV_LOGIN_CODE=true` is only for a temporary demo because it displays login codes in the browser. Turn it off and add real email delivery before inviting a wider team.
