@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: video-mark
+    runtime: docker
+    plan: starter
+    autoDeploy: true
+    disk:
+      name: video-mark-uploads
+      mountPath: /data/video-mark/uploads
+      sizeGB: 10
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: video-mark-db
+          property: connectionString
+      - key: APP_URL
+        sync: false
+      - key: UPLOAD_DIR
+        value: /data/video-mark/uploads
+      - key: SESSION_DAYS
+        value: "14"
+
+databases:
+  - name: video-mark-db
+    databaseName: video_mark
+    user: video_mark
+    plan: basic-256mb

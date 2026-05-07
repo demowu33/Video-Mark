@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: video_mark
+      POSTGRES_PASSWORD: video_mark
+      POSTGRES_DB: video_mark
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  app:
+    build: .
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql://video_mark:video_mark@db:5432/video_mark?schema=public
+      APP_URL: http://localhost:3000
+      UPLOAD_DIR: /data/video-mark/uploads
+      SESSION_DAYS: "14"
+    ports:
+      - "3000:3000"
+    volumes:
+      - upload_data:/data/video-mark/uploads
+
+volumes:
+  postgres_data:
+  upload_data:

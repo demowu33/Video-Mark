@@ -1,0 +1,163 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProjectRole {
+  OWNER
+  MEMBER
+}
+
+enum VideoStatus {
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum CommentStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
+
+enum AnnotationKind {
+  RECT
+  ARROW
+  FREEHAND
+}
+
+model User {
+  id            String              @id @default(uuid())
+  email         String              @unique
+  name          String?
+  createdAt     DateTime            @default(now())
+  sessions      Session[]
+  loginCodes    LoginCode[]
+  projects      Project[]           @relation("ProjectCreator")
+  memberships   ProjectMember[]
+  versions      VideoVersion[]      @relation("VersionUploader")
+  comments      ReviewComment[]
+  replies       CommentReply[]
+  notifications Notification[]
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model LoginCode {
+  id        String   @id @default(uuid())
+  email     String
+  codeHash  String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([email, expiresAt])
+}
+
+model Project {
+  id          String          @id @default(uuid())
+  name        String
+  description String?
+  creatorId   String
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  creator     User            @relation("ProjectCreator", fields: [creatorId], references: [id])
+  members     ProjectMember[]
+  versions    VideoVersion[]
+}
+
+model ProjectMember {
+  id        String      @id @default(uuid())
+  projectId String
+  userId    String
+  role      ProjectRole @default(MEMBER)
+  createdAt DateTime    @default(now())
+  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+}
+
+model VideoVersion {
+  id           String          @id @default(uuid())
+  projectId    String
+  version      Int
+  originalName String
+  filePath     String
+  coverPath    String?
+  fileSize     Int
+  mimeType     String
+  durationMs   Int             @default(0)
+  status       VideoStatus     @default(PROCESSING)
+  uploadedById String
+  createdAt    DateTime        @default(now())
+  project      Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  uploadedBy   User            @relation("VersionUploader", fields: [uploadedById], references: [id])
+  comments     ReviewComment[]
+
+  @@unique([projectId, version])
+  @@index([projectId, createdAt])
+}
+
+model ReviewComment {
+  id        String          @id @default(uuid())
+  versionId String
+  authorId  String
+  timeMs    Int
+  body      String
+  status    CommentStatus   @default(OPEN)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  version   VideoVersion    @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  author    User            @relation(fields: [authorId], references: [id])
+  annotation Annotation?
+  replies   CommentReply[]
+
+  @@index([versionId, timeMs])
+}
+
+model Annotation {
+  id        String         @id @default(uuid())
+  commentId String         @unique
+  kind      AnnotationKind
+  payload   Json
+  createdAt DateTime       @default(now())
+  comment   ReviewComment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+}
+
+model CommentReply {
+  id        String        @id @default(uuid())
+  commentId String
+  authorId  String
+  body      String
+  createdAt DateTime      @default(now())
+  comment   ReviewComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  author    User          @relation(fields: [authorId], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  body      String
+  href      String
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+}
