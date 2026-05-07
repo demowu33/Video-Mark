@@ -1,5 +1,6 @@
 "use client";
 
+import { createClient } from "@supabase/supabase-js";
 import { Upload, UserPlus, Video } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -39,6 +40,18 @@ export function ProjectDetail({ project }: { project: ProjectDetailData }) {
     if (!file) return;
     setUploading(true);
     setMessage("");
+    const signedUpload = await uploadViaSupabase(file);
+    if (signedUpload) {
+      setUploading(false);
+      if (!signedUpload.ok) {
+        setMessage(signedUpload.error);
+        return;
+      }
+      router.push(`/review/${signedUpload.versionId}`);
+      router.refresh();
+      return;
+    }
+
     const formData = new FormData();
     formData.append("file", file);
     const response = await fetch(`/api/projects/${project.id}/videos`, {
@@ -53,6 +66,59 @@ export function ProjectDetail({ project }: { project: ProjectDetailData }) {
     }
     router.push(`/review/${data.version.id}`);
     router.refresh();
+  }
+
+  async function uploadViaSupabase(file: File) {
+    const presignResponse = await fetch(`/api/projects/${project.id}/videos/presign`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fileName: file.name,
+        mimeType: file.type,
+        fileSize: file.size
+      })
+    });
+
+    const presign = await presignResponse.json();
+    if (presignResponse.status === 400) {
+      if (presign.error?.includes("Signed uploads are only available")) return null;
+    }
+
+    if (!presignResponse.ok) {
+      return { ok: false as const, error: presign.error ?? "签名上传初始化失败" };
+    }
+
+    const supabase = createClient(presign.supabase.url, presign.supabase.anonKey);
+    const { error: uploadError } = await supabase.storage
+      .from(presign.bucket)
+      .uploadToSignedUrl(presign.upload.path, presign.upload.token, file, {
+        contentType: file.type,
+        upsert: false
+      });
+
+    if (uploadError) {
+      return { ok: false as const, error: uploadError.message };
+    }
+
+    const durationMs = await getVideoDurationMs(file);
+    const completeResponse = await fetch(`/api/projects/${project.id}/videos/complete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        versionNumber: presign.versionNumber,
+        fileName: file.name,
+        filePath: presign.upload.path,
+        fileSize: file.size,
+        mimeType: file.type,
+        durationMs
+      })
+    });
+    const complete = await completeResponse.json();
+    if (!completeResponse.ok) {
+      return { ok: false as const, error: complete.error ?? "保存视频版本失败" };
+    }
+
+    return { ok: true as const, versionId: complete.version.id };
   }
 
   async function inviteMember(event: React.FormEvent) {
@@ -202,4 +268,21 @@ function formatDuration(ms: number) {
   const minutes = Math.floor(total / 60);
   const seconds = String(total % 60).padStart(2, "0");
   return `${minutes}:${seconds}`;
+}
+
+function getVideoDurationMs(file: File) {
+  return new Promise<number>((resolve) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    video.onloadedmetadata = () => {
+      URL.revokeObjectURL(url);
+      resolve(Number.isFinite(video.duration) ? Math.round(video.duration * 1000) : 0);
+    };
+    video.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(0);
+    };
+    video.src = url;
+  });
 }

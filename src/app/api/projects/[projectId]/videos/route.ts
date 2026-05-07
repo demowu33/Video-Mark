@@ -2,7 +2,7 @@ import { VideoStatus } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth";
 import { assertProjectOwner, routeError } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
-import { saveVideoFile } from "@/lib/storage";
+import { getStorageDriver, saveVideoFile } from "@/lib/storage";
 import { generateCover, probeDurationMs } from "@/lib/video";
 
 export const runtime = "nodejs";
@@ -12,6 +12,13 @@ export async function POST(request: Request, { params }: { params: { projectId: 
     const actor = await getCurrentUser();
     if (!actor) return Response.json({ error: "Unauthorized" }, { status: 401 });
     await assertProjectOwner(params.projectId, actor.id);
+
+    if (getStorageDriver() === "supabase") {
+      return Response.json(
+        { error: "Supabase storage uses signed browser uploads. Use /videos/presign first." },
+        { status: 400 }
+      );
+    }
 
     const formData = await request.formData();
     const file = formData.get("file");

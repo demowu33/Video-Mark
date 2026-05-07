@@ -34,23 +34,30 @@ docker compose up --build
 
 Uploaded videos are stored in the `upload_data` Docker volume. FFmpeg is used to read video duration and generate thumbnails. If FFmpeg is unavailable, uploads still work, but duration or thumbnails may be missing.
 
-## Render Deployment
+## Vercel + Supabase Deployment
 
-This repository includes `render.yaml` for a Render Blueprint:
+This is the recommended low-cost demo deployment:
 
-- Docker web service for the Next.js app
-- Managed PostgreSQL database
-- Persistent disk mounted at `/data/video-mark/uploads`
-- `UPLOAD_DIR` configured to store uploaded videos on that disk
+- Vercel runs the Next.js app.
+- Supabase Postgres stores users, projects, versions, comments, annotations, and notifications.
+- Supabase Storage stores uploaded videos in a private bucket.
 
-After pushing this repo to GitHub:
+Create a Supabase project, then create a private Storage bucket named `videos`.
 
-1. Open Render Dashboard.
-2. Choose **New > Blueprint**.
-3. Connect this GitHub repository.
-4. Set `APP_URL` to the Render service URL after the first deploy, for example `https://video-mark.onrender.com`.
-5. Deploy the Blueprint.
+Set these environment variables in Vercel:
 
-The Docker container runs `prisma migrate deploy` before starting the app, so database migrations are applied automatically on deploy.
+```text
+DATABASE_URL=your Supabase pooled or direct Postgres connection string
+APP_URL=https://your-vercel-domain.vercel.app
+SESSION_DAYS=14
+STORAGE_DRIVER=supabase
+SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your Supabase service_role key
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your Supabase anon key
+SUPABASE_STORAGE_BUCKET=videos
+```
+
+The Vercel build command is defined in `vercel.json` and runs Prisma migrations before building.
 
 Production note: email delivery is not wired yet. Until a real email provider is added, production login code delivery needs to be implemented before inviting a wider team.
